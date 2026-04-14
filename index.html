@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <base href="https://cdn.jsdelivr.net/gh/reeyuki/ytlifeomg@main/" />
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Youtubers Life Omg</title>
+
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        height: 100%;
+        width: 100%;
+        background: black;
+      }
+
+      #unity-canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #231f20;
+      }
+
+      #loading-text {
+        font-weight: bold;
+        background: linear-gradient(
+          270deg,
+          #ff0000,
+          #ff7f00,
+          #ffff00,
+          #00ff00,
+          #0000ff,
+          #4b0082,
+          #8f00ff
+        );
+        background-size: 400% 400%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: rainbow 3s ease infinite;
+        font-size: 48px;
+        font-family: cursive;
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      @keyframes rainbow {
+        0% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+        100% {
+          background-position: 0% 50%;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="loading-text">LOADING...</div>
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+
+    <script src="Build/yt.loader.js"></script>
+
+    <script>
+      const loadingText = document.querySelector("#loading-text");
+      let loadedBytes = 0;
+
+      async function fetchWithProgress(url) {
+        const response = await fetch(url);
+        const reader = response.body.getReader();
+
+        let chunks = [];
+        let received = 0;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          received += value.length;
+          loadedBytes += value.length;
+          chunks.push(value);
+
+          const mbDone = (loadedBytes / (1024 * 1024)).toFixed(2);
+          loadingText.textContent = `LOADING... ${mbDone} MB`;
+        }
+
+        const fullBuffer = new Uint8Array(received);
+        let offset = 0;
+
+        for (let chunk of chunks) {
+          fullBuffer.set(chunk, offset);
+          offset += chunk.length;
+        }
+
+        return fullBuffer.buffer;
+      }
+
+      async function mergeFiles(fileParts, cacheKey) {
+        const cache = await caches.open("gash-cache");
+        const cached = await cache.match(cacheKey);
+
+        if (cached) {
+          const blob = await cached.blob();
+          return URL.createObjectURL(blob);
+        }
+
+        const buffers = await Promise.all(
+          fileParts.map((part) => fetchWithProgress(part)),
+        );
+
+        const mergedBlob = new Blob(buffers);
+        await cache.put(cacheKey, new Response(mergedBlob));
+
+        return URL.createObjectURL(mergedBlob);
+      }
+
+      function getParts(file, start, end) {
+        const parts = [];
+        for (let i = start; i <= end; i++) {
+          parts.push(file + ".part" + String(i).padStart(3, "0"));
+        }
+        return parts;
+      }
+
+      (async () => {
+        const canvas = document.querySelector("#unity-canvas");
+
+        const dataUrl = await mergeFiles(
+          getParts("Build/yt.data", 1, 26),
+          "yt.data",
+        );
+
+        const wasmUrl = await mergeFiles(
+          getParts("Build/yt.wasm", 1, 3),
+          "yt.wasm",
+        );
+
+        const frameworkUrl = "Build/yt.framework.js";
+
+        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+          const meta = document.createElement("meta");
+          meta.name = "viewport";
+          meta.content =
+            "width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes";
+          document.head.appendChild(meta);
+
+          canvas.style.width = "100%";
+          canvas.style.height = "100%";
+          canvas.style.position = "fixed";
+
+          document.body.style.textAlign = "left";
+        }
+
+        const config = {
+          dataUrl,
+          frameworkUrl,
+          codeUrl: wasmUrl,
+          streamingAssetsUrl: "StreamingAssets",
+          companyName: "U-Play online",
+          productName: "Youtubers Life",
+          productVersion: "1.6.3e",
+        };
+
+        createUnityInstance(canvas, config).then(() => {
+          loadingText.style.display = "none";
+        });
+      })();
+    </script>
+  </body>
+</html>
