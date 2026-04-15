@@ -22,6 +22,18 @@
     </div>
 
     <script>
+      /*
+       * Split Build Loader
+       */
+
+      var SPLIT_BUILD = {
+        buildDir: "Build",
+        dataBaseName: "yt.data",
+        dataPartCount: 26,
+        wasmBaseName: "yt.wasm",
+        wasmPartCount: 3,
+      };
+
       window.addEventListener("load", function () {
         if ("serviceWorker" in navigator) {
           navigator.serviceWorker
@@ -65,7 +77,11 @@
         var parts = [];
         for (var i = 0; i < partCount; i += 1) {
           parts.push(
-            "Build/" + baseName + ".part" + String(i).padStart(3, "0"),
+            SPLIT_BUILD.buildDir +
+              "/" +
+              baseName +
+              ".part" +
+              String(i).padStart(3, "0"),
           );
         }
         return parts;
@@ -108,11 +124,15 @@
 
         loadingBar.style.display = "block";
 
-        var buildUrl = "Build";
+        var buildUrl = SPLIT_BUILD.buildDir;
         var loaderUrl = buildUrl + "/yt.loader.js";
 
-        var dataUrl = await mergeFiles(getParts("yt.data", 26));
-        var wasmUrl = await mergeFiles(getParts("yt.wasm", 3));
+        var dataUrl = await mergeFiles(
+          getParts(SPLIT_BUILD.dataBaseName, SPLIT_BUILD.dataPartCount),
+        );
+        var wasmUrl = await mergeFiles(
+          getParts(SPLIT_BUILD.wasmBaseName, SPLIT_BUILD.wasmPartCount),
+        );
 
         var config = {
           dataUrl: dataUrl,
